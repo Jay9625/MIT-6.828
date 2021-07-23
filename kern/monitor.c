@@ -58,6 +58,25 @@ int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
 	// Your code here.
+	cprintf("Stack backtrace:\n");
+	uint32_t ebp = read_ebp();                					// 获取ebp的值
+	uint32_t *ebp_base_ptr = (uint32_t *)ebp;       			// 转化为指针
+	while (ebp_base_ptr != 0x0) {								// 在entry.S中可知，入口函数的ebp为0x0，迭代至入口函数
+		uint32_t eip = ebp_base_ptr[1];   		  				// 在压入ebp之前，call指令将函数返回地址压入，因此向上取出一个字
+		cprintf("ebp %08x eip %08x args ", *ebp_base_ptr, eip);
+		
+		uint32_t *args = ebp_base_ptr + 2;             			// call之前的栈地址
+
+		for (int i = 0; i < 5; ++i) {             
+			cprintf("%08x ", args[i]);
+		}
+		
+		struct Eipdebuginfo info;
+		debuginfo_eip(eip, &info);								// 获取符号信息
+		cprintf("    %s:%d: %.*s+%d\r\n",
+                info.eip_file, info.eip_line, info.eip_fn_namelen, info.eip_fn_name, eip - info.eip_fn_addr);
+		ebp_base_ptr = (uint32_t *)*ebp_base_ptr;
+	}
 	return 0;
 }
 
