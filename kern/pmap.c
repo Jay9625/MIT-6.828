@@ -95,7 +95,7 @@ boot_alloc(uint32_t n)
 	// to any kernel code or global variables.
 	if (!nextfree) {
 		extern char end[];
-		cprintf("end: %08x\n", end);
+		// cprintf("end: %08x\n", end);
 		nextfree = ROUNDUP((char *) end, PGSIZE);
 	}
 
@@ -107,7 +107,7 @@ boot_alloc(uint32_t n)
 	result = nextfree;
 	if (n > 0) {
 		nextfree = ROUNDUP((char *) nextfree + n, PGSIZE);
-		cprintf("result %08x\n", (void *) result);
+		// cprintf("result %08x\n", (void *) result);
 		if ((uint32_t) nextfree > KERNBASE + npages * PGSIZE) {
 			panic("Out of menmory\n");
 		} else {
@@ -165,14 +165,14 @@ mem_init(void)
 	// to initialize all fields of each struct PageInfo to 0.
 	// Your code goes here:
 	pages = (struct PageInfo*) boot_alloc(sizeof(struct PageInfo) * npages);
-	cprintf("pgs %08x\n", (void *) pages);
 	memset(pages, 0, sizeof(struct PageInfo) * npages);
 
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
-
+	envs = boot_alloc(sizeof(struct Env) * NENV);
+	memset(envs, 0, sizeof(struct Env) * NENV);
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
 	// up the list of free physical pages. Once we've done so, all further
@@ -203,7 +203,7 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
-
+	boot_map_region(kern_pgdir, UENVS, PTSIZE, PADDR(envs), PTE_U);
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
 	// stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -588,7 +588,16 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
+	size_t t = (size_t) va;
+	size_t start = ROUNDDOWN((size_t) va, PGSIZE), end = ROUNDUP((size_t) va + len, PGSIZE);
+	for (size_t i = start; i < end; i += PGSIZE) {
+		pte_t *pte = pgdir_walk(env->env_pgdir, (void*) i, 0);
+		if (i >= ULIM || !(pte && *pte & (perm | PTE_P))) {
+			user_mem_check_addr = (i == start ? t:i);
+			return -E_FAULT;
+		}
 
+	}
 	return 0;
 }
 
