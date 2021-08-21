@@ -99,7 +99,6 @@ sys_exofork(void)
 	newEnv->env_status = ENV_NOT_RUNNABLE;
 	newEnv->env_tf = curenv->env_tf;
 	newEnv->env_tf.tf_regs.reg_eax = 0;
-	cprintf("@@@ %08x\n", newEnv->env_tf.tf_eip);
 	return newEnv->env_id;
 }
 
@@ -145,7 +144,13 @@ static int
 sys_env_set_pgfault_upcall(envid_t envid, void *func)
 {
 	// LAB 4: Your code here.
-	panic("sys_env_set_pgfault_upcall not implemented");
+	// panic("sys_env_set_pgfault_upcall not implemented");
+	struct Env *pEnv;
+	int r;
+	if ((r = envid2env(envid, &pEnv, 1)))
+		return r;
+	pEnv->env_pgfault_upcall = func;
+	return 0;
 }
 
 // Allocate a page of memory and map it at 'va' with permission
@@ -235,12 +240,11 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	pte_t *ppte;
 	struct PageInfo *pp = page_lookup(envsrc->env_pgdir, srcva, &ppte);
 
-	if (t_srcva >= UTOP || PGOFF(t_srcva) || t_dstva >= UTOP || PGOFF(t_dstva) || (!pp) || (!(perm & PTE_U)) || (!(perm & PTE_P)) || (perm & ~PTE_SYSCALL) || !((perm & PTE_W) && ((*ppte) & PTE_W)))
+	if (t_srcva >= UTOP || PGOFF(t_srcva) || t_dstva >= UTOP || PGOFF(t_dstva) || (!pp) || (!(perm & PTE_U)) || (!(perm & PTE_P)) || (perm & ~PTE_SYSCALL) || ((((*ppte) & PTE_W) == 0) && (perm & PTE_W)))
 		return -E_INVAL;
 
 	if ((ret = page_insert(envdst->env_pgdir, pp, dstva, perm)))
 		return ret;
-	cprintf("@@@ page map from 0x%08x to 0x%08x\n", t_srcva, t_dstva);
 	return 0;
 }
 
@@ -368,6 +372,8 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			return sys_page_unmap(a1, (void *)a2);
 		case SYS_env_set_status:
 			return sys_env_set_status(a1, a2);
+		case SYS_env_set_pgfault_upcall:
+			return sys_env_set_pgfault_upcall(a1, (void *)a2);
 		default:
 			return -E_INVAL;
 	}
