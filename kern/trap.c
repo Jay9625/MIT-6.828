@@ -69,6 +69,10 @@ static const char *trapname(int trapno)
 	extern void fn();	\
 	SETGATE(idt[num], 0, GD_KT, fn, pl)
 
+#define DECLARE_IRQ(fn, num, pl)	\
+	extern void fn();	\
+	SETGATE(idt[num+IRQ_OFFSET], 0, GD_KT, fn, pl)
+
 void
 trap_init(void)
 {
@@ -96,6 +100,14 @@ trap_init(void)
 	DECLARE_ENTRY(t_mchk, T_MCHK, 0);
 	DECLARE_ENTRY(t_simderr, T_SIMDERR, 0);
 	DECLARE_ENTRY(t_syscall, T_SYSCALL, 3);
+
+	DECLARE_IRQ(irq_timer, IRQ_TIMER, 0);
+	DECLARE_IRQ(irq_kbd, IRQ_KBD, 0);
+	DECLARE_IRQ(irq_serial, IRQ_SERIAL, 0);
+	DECLARE_IRQ(irq_spurious, IRQ_SPURIOUS, 0);
+	DECLARE_IRQ(irq_ide, IRQ_IDE, 0);
+	DECLARE_IRQ(irq_error, IRQ_ERROR, 0);
+	
 	// Per-CPU setup 
 	trap_init_percpu();
 }
@@ -230,7 +242,12 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
-
+	if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
+		cprintf("Timer interrupt on irq 0\n");
+		lapic_eoi();
+		sched_yield();
+		return;
+	}
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
