@@ -62,7 +62,15 @@ alloc_block(void)
 	// super->s_nblocks blocks in the disk altogether.
 
 	// LAB 5: Your code here.
-	panic("alloc_block not implemented");
+	// panic("alloc_block not implemented");
+
+	for (uint32_t i = 1; i < super->s_nblocks; ++i) {
+		if (block_is_free(i)) {
+			bitmap[i / 32] ^= 1 << (i % 32);
+			flush_block(&bitmap[i/32]);
+			return i;
+		}
+	}
 	return -E_NO_DISK;
 }
 
@@ -135,7 +143,33 @@ static int
 file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool alloc)
 {
        // LAB 5: Your code here.
-       panic("file_block_walk not implemented");
+    //    panic("file_block_walk not implemented");
+	int r;
+	
+	if (filebno >= NDIRECT + NINDIRECT)
+		return -E_INVAL;
+	
+	if (filebno < NDIRECT) {
+		if (ppdiskbno)
+			*ppdiskbno = &(f->f_direct[filebno]);
+		return 0;
+	}
+
+	if ((!alloc) && (!f->f_indirect))
+		return -E_NOT_FOUND;
+	
+	if (!f->f_indirect) {
+		if ((r = alloc_block()) < 0) 
+			return r;
+		f->f_indirect = r;
+		char* va = diskaddr(r);
+		memset(va, 0, BLKSIZE);
+		flush_block(va);
+	}
+
+	if (ppdiskbno)
+		*ppdiskbno = (uint32_t *) diskaddr(f->f_indirect) + filebno - NDIRECT;
+	return 0;
 }
 
 // Set *blk to the address in memory where the filebno'th
@@ -150,7 +184,22 @@ int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
        // LAB 5: Your code here.
-       panic("file_get_block not implemented");
+    //    panic("file_get_block not implemented");
+	int r;
+	uint32_t *pdiskbno;
+	if ((r = file_block_walk(f, filebno, &pdiskbno, 1)))
+		return r;
+	
+	if (*pdiskbno == 0) {
+		// not allocate a block yet
+		if ((r = alloc_block()) < 0) 
+			return r;
+		*pdiskbno = r;
+		memset(diskaddr(r), 0, BLKSIZE);
+		flush_block(diskaddr(r));
+	}
+	*blk = diskaddr(*pdiskbno);
+	return 0;
 }
 
 // Try to find a file named "name" in dir.  If so, set *file to it.
@@ -432,11 +481,13 @@ file_flush(struct File *f)
 {
 	int i;
 	uint32_t *pdiskbno;
-
+	int r = 0;
 	for (i = 0; i < (f->f_size + BLKSIZE - 1) / BLKSIZE; i++) {
-		if (file_block_walk(f, i, &pdiskbno, 0) < 0 ||
+		if ((r = file_block_walk(f, i, &pdiskbno, 0) ) ||
 		    pdiskbno == NULL || *pdiskbno == 0)
-			continue;
+			{
+				continue;
+			}
 		flush_block(diskaddr(*pdiskbno));
 	}
 	flush_block(f);
