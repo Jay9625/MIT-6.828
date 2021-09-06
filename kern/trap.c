@@ -234,7 +234,7 @@ trap_dispatch(struct Trapframe *tf)
 	// The hardware sometimes raises these because of noise on the
 	// IRQ line or other reasons. We don't care.
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_SPURIOUS) {
-		cprintf("Spurious interrupt on irq 7\n");
+		// cprintf("Spurious interrupt on irq 7\n");
 		print_trapframe(tf);
 		return;
 	}
@@ -243,7 +243,7 @@ trap_dispatch(struct Trapframe *tf)
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
-		cprintf("Timer interrupt on irq 0\n");
+		// cprintf("Timer interrupt on irq 0\n");
 		lapic_eoi();
 		sched_yield();
 		return;
@@ -252,15 +252,17 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle keyboard and serial interrupts.
 	// LAB 5: Your code here.
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_SERIAL) {
-		cprintf("Serial interrupt on irq 4\n");
+		// cprintf("Serial interrupt on irq 4\n");
 		lapic_eoi();
 		serial_intr();
+		return;
 	}		
 
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_KBD) {
-		cprintf("Keyboard interrupt on irq 1\n");
+		// cprintf("Keyboard interrupt on irq 1\n");
 		lapic_eoi();
 		kbd_intr();
+		return;
 	}
 
 	// Unexpected trap: The user process or the kernel has a bug.
