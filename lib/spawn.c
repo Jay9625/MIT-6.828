@@ -302,6 +302,13 @@ static int
 copy_shared_pages(envid_t child)
 {
 	// LAB 5: Your code here.
+	int r;
+	uint32_t pg;
+	for (pg = UTEXT; pg < USTACKTOP; pg += PGSIZE) {
+		if ((uvpd[PDX(pg)] & PTE_P) && (uvpt[PGNUM(pg)] & (PTE_SHARE)))
+			if ((r = sys_page_map(thisenv->env_id, (void*) pg, child, (void *) pg, uvpt[PGNUM(pg)] & PTE_SYSCALL)))
+				return r;
+	}
 	return 0;
 }
 
